@@ -90,3 +90,65 @@ static int gettok() {
     LastChar = getchar();
     return ThisChar;
 }
+
+namespace {
+// 基类，派生出各种ExprAST，让后续步骤知道在处理什么
+class ExprAST {
+public:
+    virtual ~ExprAST() = default;
+};
+
+class NumberExprAST : public ExprAST {
+    double Val;
+
+public:
+    NumberExprAST(double Val) : Val(Val) {}
+};
+
+class VariableExprAST : public ExprAST {
+    std::string Name;
+public:
+    VariableExprAST(const std::string &Name) : Name(Name) {}
+};
+
+class BinaryExprAST : public ExprAST {
+    char Op;
+    std::unique_ptr<ExprAST> LHS, RHS;
+public:
+    // std::move()将对象的值直接移动过去，而不是复制，避免额外的内存空间开销
+    BinaryExprAST(char op, std::unique_ptr<ExprAST> LHS,
+                  std::unique_ptr<ExprAST> RHS)
+        : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+};
+
+class CallExprAST : public ExprAST {
+    std::string Callee;
+    std::vector<std::unique_ptr<ExprAST>> Args;
+public:
+    CallExprAST(const std::string &Callee,
+                std::vector<std::unique_ptr<ExprAST>> Args)
+        : Callee(Callee), Args(std::move(Args)) {}
+};
+
+// 表示函数原型的一些信息
+class PrototypeAST {
+    std::string Name;
+    std::vector<std::string> Args;
+
+public:
+    PrototypeAST(const std::string &Name, std::vector<std::string> Args)
+        : Name(Name), Args(std::move(Args)) {}
+    
+    const std::string &getName() const { return Name; }
+};
+
+class FunctionAST {
+    std::unique_ptr<PrototypeAST> Proto;
+    std::unique_ptr<ExprAST> Body;
+
+public:
+    FunctionAST(std::unique_ptr<PrototypeAST> Proto,
+                std::unique_ptr<ExprAST> Body)
+        : Proto(std::move(Proto)), Body(std::move(Body)) {}
+};
+};
