@@ -91,6 +91,10 @@ static int gettok() {
     return ThisChar;
 }
 
+//=========
+// Abstract Syntax Tree
+//=========
+
 namespace {
 // 基类，派生出各种ExprAST，让后续步骤知道在处理什么
 class ExprAST {
@@ -151,4 +155,25 @@ public:
                 std::unique_ptr<ExprAST> Body)
         : Proto(std::move(Proto)), Body(std::move(Body)) {}
 };
-};
+}; // end anonymous namespace
+
+// =========
+// Parser
+// =========
+
+// 提供一个简单的token缓冲区
+// CurTok表示当前paser正在处理的token，即当前需要paser的token
+// getNextToken()更新CurTok
+static int CurTok;
+static int getNextToken() { return CurTok = gettok(); }
+
+// 用于处理错误
+std::unique_ptr<ExprAST> LogError(const char *Str) {
+    fprintf(stderr, "LogError: %s\n", Str);
+    return nullptr;
+}
+
+std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
+    LogError(Str);
+    return nullptr;
+}
