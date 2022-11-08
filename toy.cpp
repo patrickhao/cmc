@@ -177,3 +177,9 @@ std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
     LogError(Str);
     return nullptr;
 }
+
+static std::unique_ptr<ExprAST> ParseNumberExpr() {
+    auto Result = std::make_unique<NumberExprAST>(NumVal);
+    getNextToken();
+    return std::move(Result);
+}
