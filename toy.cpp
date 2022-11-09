@@ -167,6 +167,22 @@ public:
 static int CurTok;
 static int getNextToken() { return CurTok = gettok(); }
 
+static std::map<char, int> BinopPrecedence;
+
+static int GetTokPrecedence() {
+    if (!isascii(CurTok)) { // 如果当前的token不是ascii码
+        return -1;
+    }
+
+    // 保证之前的token是一个声明了的binop
+    int TokPrec = BinopPrecedence[CurTok];
+    if (TokPrec <= 0) {
+        return -1;
+    }
+
+    return TokPrec;
+}
+
 // 用于处理错误
 std::unique_ptr<ExprAST> LogError(const char *Str) {
     fprintf(stderr, "LogError: %s\n", Str);
@@ -178,8 +194,125 @@ std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
     return nullptr;
 }
 
+static std::unique_ptr<ExprAST> ParseExpression();
+
+// numberexpr ::= number
 static std::unique_ptr<ExprAST> ParseNumberExpr() {
     auto Result = std::make_unique<NumberExprAST>(NumVal);
-    getNextToken();
+    getNextToken(); // 吞掉当前number
     return std::move(Result);
+}
+
+// parenexpr ::= '(' expression ')'
+static std::unique_ptr<ExprAST> ParseParenExpr() {
+    getNextToken(); // 吞掉'('
+    auto V = ParseExpression();
+    if (!V) {
+        return nullptr;
+    }
+
+    if (CurTok != ')') {
+        return LogError("expected ')'");
+    }
+    getNextToken(); // 吞掉')'
+    return V;
+}
+
+// identifierexpr
+// ::= identifier
+// ::= identifier '(' expression* ')'
+static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
+    std::string IdName = IdentifierStr;
+
+    getNextToken(); // 吞掉identifier
+
+    // 简单的变量引用
+    if (CurTok != '(') {
+        return std::make_unique<VariableExprAST>(IdName);
+    }
+
+    getNextToken(); // 吞掉'('
+    std::vector<std::unique_ptr<ExprAST>> Args;
+    // 排除()中没有表达式的情况
+    if (CurTok != ')') {
+        while (true) {
+            if (auto Arg = ParseExpression()) {
+                Args.push_back(std::move(Arg));
+            } else {
+                return nullptr;
+            }
+            
+            if (CurTok == ')') {
+                break;
+            }
+
+            if (CurTok != ',') {
+                return LogError("Expected ')' or ',' in argument list");
+            }
+            getNextToken();
+        }
+    }
+
+    getNextToken(); // 吞掉')'
+
+    return std::make_unique<CallExprAST>(IdName, std::move(Args));
+}
+
+// primary
+// ::= identifierexpr
+// ::= numberexpr
+// ::= parenexpr
+static std::unique_ptr<ExprAST> ParsePrimay() {
+    switch (CurTok) {
+    default:
+        return LogError("unknown token when expecting an expression");
+    case tok_identifier:
+        return ParseIdentifierExpr();
+    case tok_number:
+        return ParseNumberExpr();
+    case '(':
+        return ParseParenExpr();
+    }
+}
+
+// binoprhs
+// ::= ('+' primary)*
+static std::unique_ptr<ExprAST> ParseBinOPRHS(int ExprPrec, 
+                                              std::unique_ptr<ExprAST> LHS) {
+    while (true) {
+        int TokPrec = GetTokPrecedence();
+
+        if (TokPrec < ExprPrec) {
+            return LHS; 
+        }
+
+        int BinOp = CurTok;
+        getNextToken();
+
+        auto RHS = ParsePrimay();
+        if (!RHS) {
+            return nullptr;
+        }
+
+        int NextPrec = GetTokPrecedence();
+        if (TokPrec < NextPrec) {
+            RHS = ParseBinOPRHS(TokPrec + 1, std::move(RHS));
+            if (!RHS) {
+                return nullptr;
+            }
+        }
+
+        LHS = std::make_unique<BinaryExprAST>(BinOp, std::move(LHS), std::move(RHS));
+    }
+}
+
+// expression
+// ::= primary binoprhs
+static std::unique_ptr<ExprAST> ParseExpression() {
+    auto LHS = ParsePrimay();
+    if (!LHS) {
+        return nullptr;
+    }
+
+    return ParseBinOPRHS(0, std::move(LHS));
 }
