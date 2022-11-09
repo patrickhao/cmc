@@ -167,15 +167,19 @@ public:
 static int CurTok;
 static int getNextToken() { return CurTok = gettok(); }
 
+// 运算符的优先级
 static std::map<char, int> BinopPrecedence;
 
+// 获取运算符的优先级
 static int GetTokPrecedence() {
     if (!isascii(CurTok)) { // 如果当前的token不是ascii码
         return -1;
     }
 
-    // 保证之前的token是一个声明了的binop
+    // 保证token是一个声明了的binop
     int TokPrec = BinopPrecedence[CurTok];
+    // 如果不在map中
+    // 对于不是binop的运算符返回-1
     if (TokPrec <= 0) {
         return -1;
     }
@@ -203,6 +207,7 @@ static std::unique_ptr<ExprAST> ParseNumberExpr() {
     return std::move(Result);
 }
 
+// 括号的情况
 // parenexpr ::= '(' expression ')'
 static std::unique_ptr<ExprAST> ParseParenExpr() {
     getNextToken(); // 吞掉'('
@@ -277,18 +282,22 @@ static std::unique_ptr<ExprAST> ParsePrimay() {
 
 // binoprhs
 // ::= ('+' primary)*
-static std::unique_ptr<ExprAST> ParseBinOPRHS(int ExprPrec, 
+// LHS是当前已经转换的部分
+static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec, 
                                               std::unique_ptr<ExprAST> LHS) {
     while (true) {
         int TokPrec = GetTokPrecedence();
 
         if (TokPrec < ExprPrec) {
+            // 运算符的优先级小于当前的优先级，直接返回LHS
             return LHS; 
         }
 
+        // 存储运算符
         int BinOp = CurTok;
         getNextToken();
 
+        // 拿到下一个primary，运行后此时的token指向下一个运算符
         auto RHS = ParsePrimay();
         if (!RHS) {
             return nullptr;
@@ -296,7 +305,8 @@ static std::unique_ptr<ExprAST> ParseBinOPRHS(int ExprPrec,
 
         int NextPrec = GetTokPrecedence();
         if (TokPrec < NextPrec) {
-            RHS = ParseBinOPRHS(TokPrec + 1, std::move(RHS));
+            // 当前运算符的优先级小于下一个运算符的优先级
+            RHS = ParseBinOpRHS(TokPrec + 1, std::move(RHS));
             if (!RHS) {
                 return nullptr;
             }
@@ -309,10 +319,11 @@ static std::unique_ptr<ExprAST> ParseBinOPRHS(int ExprPrec,
 // expression
 // ::= primary binoprhs
 static std::unique_ptr<ExprAST> ParseExpression() {
+    // 拿到一个表达式的第一个变量，然后将后续的交给ParseBinOPRHS
     auto LHS = ParsePrimay();
     if (!LHS) {
         return nullptr;
     }
 
-    return ParseBinOPRHS(0, std::move(LHS));
+    return ParseBinOpRHS(0, std::move(LHS));
 }
