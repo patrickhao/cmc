@@ -398,3 +398,76 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 }
 
 // external ::= 'extern' prototype
+static std::unique_ptr<PrototypeAST> ParseExtern() {
+    getNextToken(); // 吞掉extern
+    return ParsePrototype();
+}
+
+//=========
+// Top-Level parsing
+//=========
+static void HandleDefinition() {
+    if (ParseDefination()) {
+        fprintf(stderr, "Parsed a function defination.\n");
+    } else {
+        // 忽略错误的token
+        getNextToken();
+    }
+}
+
+static void HandleExtern() {
+    if (ParseExtern()) {
+        fprintf(stderr, "Parsed an extern\n");
+    } else {
+        // 忽略错误的token
+        getNextToken();
+    }
+}
+
+static void HandleTopLevelExpresison() {
+    if (ParseTopLevelExpr()) {
+        fprintf(stderr, "Parsed a top-level expr\n");
+    } else {
+        // 忽略错误的token
+        getNextToken();
+    }
+}
+
+// top ::= definition | external | expresison | ';'
+static void MainLoop() {
+    while (true) {
+        fprintf(stderr, "ready>");
+        switch (CurTok) {
+        case tok_eof:
+            return;
+        case ';':
+            getNextToken();
+            break;
+        case tok_def:
+            HandleDefinition();
+            break;
+        case tok_extern:
+            HandleExtern();
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+//=========
+// Main driver code
+//=========
+int main() {
+    // 1是最低的优先级
+    BinopPrecedence['<'] = 10;
+    BinopPrecedence['+'] = 20;
+    BinopPrecedence['-'] = 30;
+    BinopPrecedence['*'] = 40;
+
+    fprintf(stderr, "ready> ");
+    getNextToken();
+
+    MainLoop();
+    return 0;
+}
