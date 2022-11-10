@@ -342,3 +342,59 @@ static std::unique_ptr<ExprAST> ParseExpression() {
 
     return ParseBinOpRHS(0, std::move(LHS));
 }
+
+// prototype
+// ParseDefination调用
+// ::= id '(' id* ')'
+static std::unique_ptr<PrototypeAST> ParsePrototype() {
+    if (CurTok != tok_identifier) {
+        return LogErrorP("Expected function name in prototype");
+    }
+
+    std::string FnName = IdentifierStr;
+    getNextToken(); // 吞掉'('
+
+    if (CurTok != '(') {
+        return LogErrorP("Expected '(' in prototype");
+    }
+
+    std::vector<std::string> ArgNames;
+    while (getNextToken() == tok_identifier) {
+        ArgNames.push_back(IdentifierStr);
+    }
+
+    if (CurTok != ')') {
+        return LogErrorP("Expected ')' in prototype");
+    }
+
+    getNextToken(); // 吞掉')'
+
+    return std::make_unique<PrototypeAST>(FnName, std::move(ArgNames));
+}
+
+// defination ::= 'def' prototype expression
+static std::unique_ptr<FunctionAST> ParseDefination() {
+    getNextToken(); // 吞掉def
+    auto Proto = ParsePrototype();
+    if (!Proto) {
+        return nullptr;
+    }
+
+    if (auto E = ParseExpression()) {
+        return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
+    }
+
+    return nullptr;
+}
+
+// toplevelexpr ::= expression
+static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
+    if (auto E = ParseExpression()) {
+        // 匿名的proto
+        auto Proto = std::make_unique<PrototypeAST>("__anon_expr", std::vector<std::string>());
+        return std::make_unique<FunctionAST>(std::move(Proto), std::move(E));
+    }
+    return nullptr;
+}
+
+// external ::= 'extern' prototype
