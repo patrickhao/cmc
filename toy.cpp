@@ -303,14 +303,29 @@ static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec,
             return nullptr;
         }
 
+        // 现在已经处理完了LHS以及序列中的下一个RHS，接下处理两者如何连接
+        // 一种有两种情况: (a+b) binop unparsed 或 a + (b binop unparsed)
+
         int NextPrec = GetTokPrecedence();
         if (TokPrec < NextPrec) {
+            // 情况: a + (b binop unparsed) 
             // 当前运算符的优先级小于下一个运算符的优先级
+
+            // 要保证后续的RHS都被正确转换，先递归的转换RHS，将转换完成的RHS与LHS挂在一起
+            // 转换后续RHS的时候实际上是优先考虑的后续的运算符，即优先转换后面的部分
+            // 这里传入的RHS实际上是下一次调用的LHS，即已经转换之后的
+            // TokPrec + 1是因为后续的想要继续处理，那么后续运算符的优先级应该高于当前的运算符
+            // 如果不加1，那么后续大于或者等于的都可以继续处理
+            // 加1不会影响后续的函数功能，因为ExprPrec在后续函数没有继续做加1操作
             RHS = ParseBinOpRHS(TokPrec + 1, std::move(RHS));
             if (!RHS) {
                 return nullptr;
             }
         }
+
+        // 情况: (a+b) binop unparsed
+        // 上述if相反的情况，RHS的下一个op的优先级小于当前的op，那么LHS和RHS分别居于op的两侧
+        // 使用下方代码连接
 
         LHS = std::make_unique<BinaryExprAST>(BinOp, std::move(LHS), std::move(RHS));
     }
