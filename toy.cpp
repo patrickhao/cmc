@@ -81,7 +81,7 @@ static int gettok() {
         }
     }
 
-    if (LastChar != EOF) {
+    if (LastChar == EOF) {
         return tok_eof;
     }
 
@@ -450,6 +450,7 @@ static void MainLoop() {
             HandleExtern();
             break;
         default:
+            HandleTopLevelExpresison();
             break;
         }
     }
